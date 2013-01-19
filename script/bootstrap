@@ -67,4 +67,8 @@ rm rhino1_7R3.zip
 echo "Copying closure/compiler/compiler.jar to lib/compiler.jar"
 cp closure/compiler/compiler.jar lib
 
+echo "Fetching nREPL..."
+curl -O -s http://repo1.maven.org/maven2/org/clojure/tools.nrepl/0.2.0-RC1/tools.nrepl-0.2.0-RC1.jar
+mv tools.nrepl-0.2.0-RC1.jar lib/nrepl.jar
+
 echo "[Bootstrap Completed]"
