@@ -1,0 +1,12 @@
+#!/bin/sh
+
+if [ "$CLOJURESCRIPT_HOME" = "" ]; then
+  CLOJURESCRIPT_HOME="`dirname $0`/.."
+fi
+
+CLJS_CP=''
+for next in lib/*: src/clj: src/cljs: test/cljs; do
+  CLJS_CP="${CLJS_CP}${CLOJURESCRIPT_HOME}/${next}"
+done
+
+java -cp "$CLJS_CP" clojure.main -e "(do (require 'clojure.tools.nrepl.server) (clojure.tools.nrepl.server/start-server :port 4005))"
