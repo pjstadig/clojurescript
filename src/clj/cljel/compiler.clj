@@ -541,21 +541,16 @@
 
 (defmethod emit :try*
   [{:keys [env try catch name finally]}]
-  (let [context (:context env)]
-    (if (or name finally)
-      (do
-        (when (= :expr context)
-          (emits "(function (){"))
-        (emits "try{" try "}")
-        (when name
-          (emits "catch (" (munge name) "){" catch "}"))
-        (when finally
-          (assert (not= :constant (:op finally))
-                  "finally block cannot contain constant")
-          (emits "finally {" finally "}"))
-        (when (= :expr context)
-          (emits "})()")))
-      (emits try))))
+  (let [context (:context env)
+        ret (gensym "ret")
+        ex (gensym "ex")]
+    (emits "(unwind-protect\n"
+           "(condition-case " ex "\n"
+           try
+           "(" name " \n"
+;;           "(message (format \"Caught: [%s]\" " ex "))\n"
+           catch "))\n"
+           finally ")\n")))
 
 (defn emit-let
   [{:keys [bindings expr env]} is-loop]

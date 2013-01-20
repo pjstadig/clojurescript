@@ -874,13 +874,10 @@
     (if (seq catches)
       `(~'try*
         ~@body
-        (catch ~e
-            (cond
-             ~@(mapcat
-                (fn [[_ type name & cb]]
-                  `[(instance? ~type ~e) (let [~name ~e] ~@cb)])
-                catches)
-             :else (throw ~e)))
+        (catch ~@(mapcat
+                  (fn [[_ type name & cb]]
+                    `(~type ~@cb))
+                  catches))
         ~@fin)
       `(~'try*
         ~@body
