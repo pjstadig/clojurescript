@@ -476,57 +476,45 @@
                                  method])
                               methods))
               ms (sort-by #(-> % second :params count) (seq mmap))]
-          (when (= :return (:context env))
-            (emits "return "))
-          (emitln "(function() {")
-          (emitln "var " mname " = null;")
+          (emitln "(let (")
+          (emitln "(" mname " nil)")
           (doseq [[n meth] ms]
-            (emits "var " n " = ")
+            (emitln "(" n " nil)"))
+          (emitln ")")
+          (doseq [[n meth] ms]
+            (emits "(fset '" n " ")
             (if (:variadic meth)
               (emit-variadic-fn-method meth)
               (emit-fn-method meth))
-            (emitln ";"))
-          (emitln mname " = function(" (comma-sep (if variadic
-                                                    (concat (butlast maxparams)
-                                                            ['var_args])
-                                                    maxparams)) "){")
+            (emitln ")"))
+          (let [args (gensym)]
+            (emitln "(fset '" mname " (lambda (&rest " args ")")
+            (emitln "(cond")
+            (doseq [[n meth] ms]
+              (if (:variadic meth)
+                (do (emitln "((>= (length " args ") " (count maxparams) ")")
+                    (emitln "(apply (function " n ") " args "))"))
+                (let [pcnt (count (:params meth))]
+                  (emitln "((eq (length " args ") " pcnt ")")
+                  (emitln "(apply (function " n ") " args "))"))))
+            (emitln "(t (throw 'arity-error (format \"Invalid arity: %d\""
+                    " (length " args "))))"))
+          (emitln ")")
+          (emitln ")")
+          (emitln ")")
           (when variadic
-            (emitln "var " (last maxparams) " = var_args;"))
-          (emitln "switch(arguments.length){")
-          (doseq [[n meth] ms]
-            (if (:variadic meth)
-              (do (emitln "default:")
-                  (emitln "return " n ".cljel$lang$arity$variadic("
-                          (comma-sep (butlast maxparams))
-                          (when (> (count maxparams) 1) ", ")
-                          "cljel.core.array_seq(arguments, " max-fixed-arity
-                          "));"))
-              (let [pcnt (count (:params meth))]
-                (emitln "case " pcnt ":")
-                (emitln "return " n ".call(this"
-                        (if (zero? pcnt) nil
-                            (list ","
-                                  (comma-sep
-                                   (take pcnt maxparams))))
-                        ");"))))
-          (emitln "}")
-          (emitln "throw(new Error('Invalid arity: ' + arguments.length));")
-          (emitln "};")
-          (when variadic
-            (emitln mname ".cljel$lang$maxFixedArity = " max-fixed-arity ";")
-            (emitln mname ".cljel$lang$applyTo = "
-                    (some #(let [[n m] %] (when (:variadic m) n))
-                          ms)
-                    ".cljel$lang$applyTo;"))
+            (emitln "(put '" mname " 'cljel$lang$maxFixedArity " max-fixed-arity
+                    ")"))
           (when has-name?
             (doseq [[n meth] ms]
               (let [c (count (:params meth))]
                 (if (:variadic meth)
-                  (emitln mname ".cljel$lang$arity$variadic = " n
-                          ".cljel$lang$arity$variadic;")
-                  (emitln mname ".cljel$lang$arity$" c " = " n ";")))))
-          (emitln "return " mname ";")
-          (emitln "})()")))
+                  (emitln "(put '" mname
+                          " 'cljel$lang$arity$variadic (function " n "))")
+                  (emitln "(put '" mname " 'cljel$lang$arity$" c
+                          " (function " n "))")))))
+          (emitln "(function " mname ")")
+          (emitln ")")))
       (when loop-locals
         (emitln ";})(" (comma-sep loop-locals) "))")))))
 
