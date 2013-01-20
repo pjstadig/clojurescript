@@ -74,6 +74,9 @@
 (defn- comma-sep [xs]
   (interpose "," xs))
 
+(defn- space-sep [xs]
+  (interpose " " xs))
+
 (defn- escape-char [^Character c]
   (let [cp (.hashCode c)]
     (case cp
@@ -141,14 +144,14 @@
     (emitln "goog.provide('" (munge sym) "');")))
 
 (defmulti emit-constant class)
-(defmethod emit-constant nil [x] (emits "null"))
+(defmethod emit-constant nil [x] (emits "nil"))
 (defmethod emit-constant Long [x] (emits x))
 ;; reader puts Integers in metadata
 (defmethod emit-constant Integer [x] (emits x))
 (defmethod emit-constant Double [x] (emits x))
 (defmethod emit-constant String [x]
   (emits (wrap-in-double-quotes (escape-string x))))
-(defmethod emit-constant Boolean [x] (emits (if x "true" "false")))
+(defmethod emit-constant Boolean [x] (emits (if x "t" "nil")))
 (defmethod emit-constant Character [x]
   (emits (wrap-in-double-quotes (escape-char x))))
 
@@ -157,18 +160,14 @@
     (emits \/ (.replaceAll (re-matcher #"/" pattern) "\\\\/") \/ flags)))
 
 (defmethod emit-constant clojure.lang.Keyword [x]
-  (emits \" "\\uFDD0" \:
-         (if (namespace x)
-           (str (namespace x) "/") "")
-         (name x)
-         \"))
+  (emits ":" (if (namespace x)
+               (str (namespace x) "/") "")
+         (name x)))
 
 (defmethod emit-constant clojure.lang.Symbol [x]
-  (emits \" "\\uFDD1" \'
-         (if (namespace x)
-           (str (namespace x) "/") "")
-         (name x)
-         \"))
+  (emits "'" (if (namespace x)
+               (str (namespace x) "/") "")
+         (name x)))
 
 (defn- emit-meta-constant [x & body]
   (if (meta x)
@@ -214,9 +213,7 @@
 
 (defmacro emit-wrap [env & body]
   `(let [env# ~env]
-     (when (= :return (:context env#)) (emits "return "))
-     ~@body
-     (when-not (= :expr (:context env#)) (emitln ";"))))
+     ~@body))
 
 (defmethod emit :no-op [m])
 
@@ -318,17 +315,10 @@
 
 (defmethod emit :if
   [{:keys [test then else env unchecked]}]
-  (let [context (:context env)
-        checked (not (or unchecked (safe-test? test)))]
-    (if (= :expr context)
-      (emits "(" (when checked "cljel.core.truth_") "(" test ")?" then ":" else
-             ")")
-      (do
-        (if checked
-          (emitln "if(cljel.core.truth_(" test "))")
-          (emitln "if(" test ")"))
-        (emitln "{" then "} else")
-        (emitln "{" else "}")))))
+  (let [context (:context env)]
+    (emitln "(if " test)
+    (emitln then)
+    (emitln else ")")))
 
 (defmethod emit :throw
   [{:keys [throw env]}]
@@ -343,25 +333,25 @@
         docs (if jsdoc (concat docs jsdoc) docs)
         docs (remove nil? docs)]
     (letfn [(print-comment-lines [e] (doseq [next-line (string/split-lines e)]
-                                       (emitln "* " (string/trim next-line))))]
+                                       (emitln ";; " (string/trim next-line))))]
       (when (seq docs)
-        (emitln "/**")
         (doseq [e docs]
           (when e
-            (print-comment-lines e)))
-        (emitln "*/")))))
+            (print-comment-lines e)))))))
 
 (defmethod emit :def
   [{:keys [name init env doc export]}]
-  (let [mname (munge name)]
+  (let [mname (munge name)
+        local (gensym)]
     (emit-comment doc (:jsdoc init))
-    (emits mname)
-    (if init
-      (emits " = " init)
-      (emits " = undefined"))
-    (when-not (= :expr (:context env)) (emitln ";"))
-    (when export
-      (emitln "goog.exportSymbol('" (munge export) "', " mname ");"))))
+    (when init
+      (emitln "(let ((" local " " init "))")
+      (emitln "(if (functionp " local ")")
+      (emitln "(fset '" mname " " local ")")
+      (emits "(setq " mname " " local ")")
+      (emits ")")
+      (emitln ")"))
+    (when-not (= :expr (:context env)) (emitln ""))))
 
 (defn emit-apply-to
   [{:keys [name params env]}]
@@ -393,60 +383,62 @@
 (defn emit-fn-method
   [{:keys [type name variadic params expr env recurs max-fixed-arity]}]
   (emit-wrap env
-             (emitln "(function " (munge name) "("
-                     (comma-sep (map munge params)) "){")
+             (emitln "(lambda (" (space-sep (map munge params)) ")")
+             (emitln "(labels ((" name " (" (space-sep (map munge params)) ")")
              (when type
                (emitln "var self__ = this;"))
-             (when recurs (emitln "while(true){"))
-             (emits expr)
              (when recurs
-               (emitln "break;")
-               (emitln "}"))
-             (emits "})")))
+               (emitln "(catch 'break")
+               (emitln "(while t")
+               (emitln "(catch 'continue"))
+             (let [rname (gensym)]
+               (emits "(let ((" rname " ")
+               (emits expr)
+               (emitln "))")
+               (if recurs
+                 (do (emitln "(throw 'break " rname ")")
+                     (emitln ")")
+                     (emitln ")")
+                     (emitln ")"))
+                 (emitln rname)))
+             (emitln ")")
+             (emitln "))")
+             (emitln "(" name " " (space-sep (map munge params)) ")")
+             (emitln ")")
+             (emitln ")")))
 
 (defn emit-variadic-fn-method
   [{:keys [type name variadic params expr env recurs max-fixed-arity] :as f}]
   (emit-wrap env
              (let [name (or name (gensym))
                    mname (munge name)
-                   params (map munge params)
-                   delegate-name (str mname "__delegate")]
-               (emitln "(function() { ")
-               (emitln "var " delegate-name " = function (" (comma-sep params)
-                       "){")
-               (when recurs (emitln "while(true){"))
-               (emits expr)
-               (when recurs
-                 (emitln "break;")
-                 (emitln "}"))
-               (emitln "};")
-
-               (emitln "var " mname " = function (" (comma-sep
-                                                     (if variadic
-                                                       (concat (butlast params)
-                                                               ['var_args])
-                                                       params)) "){")
+                   params (map munge params)]
+               (emits "(let ((")
+               (emitln mname " (lambda (" (space-sep
+                                           (concat (butlast params)
+                                                   ['&rest (last params)])) ")")
                (when type
                  (emitln "var self__ = this;"))
-               (when variadic
-                 (emitln "var " (last params) " = null;")
-                 (emitln "if (goog.isDef(var_args)) {")
-                 (emitln "  " (last params)
-                         " = cljel.core.array_seq("
-                         "Array.prototype.slice.call(arguments, "
-                         (dec (count params)) "),0);")
-                 (emitln "} "))
-               (emitln "return " delegate-name ".call("
-                       (string/join ", " (cons "this" params)) ");")
-               (emitln "};")
+               (when recurs
+                 (emitln "(catch 'break")
+                 (emitln "(while t")
+                 (emitln "(catch 'continue"))
+               (let [rname (gensym)]
+                 (emits "(let ((" rname " ")
+                 (emits expr)
+                 (emitln "))")
+                 (if recurs
+                   (do (emitln "(throw 'break " rname ")")
+                       (emitln ")")
+                       (emitln ")")
+                       (emitln ")"))
+                   (emitln rname))
+                 (emitln ")"))
+               (emitln ")")
+               (emitln "))")
 
-               (emitln mname ".cljel$lang$maxFixedArity = " max-fixed-arity ";")
-               (emits mname ".cljel$lang$applyTo = ")
-               (emit-apply-to (assoc f :name name))
-               (emitln ";")
-               (emitln mname ".cljel$lang$arity$variadic = " delegate-name ";")
-               (emitln "return " mname ";")
-               (emitln "})()"))))
+               (emitln mname)
+               (emitln ")"))))
 
 (defmethod emit :fn
   [{:keys [name env methods max-fixed-arity variadic recur-frames loop-lets]}]
@@ -535,11 +527,11 @@
 (defmethod emit :do
   [{:keys [statements ret env]}]
   (let [context (:context env)]
-    (when (and statements (= :expr context)) (emits "(function (){"))
+    (emitln "(progn")
     (when statements
       (emits statements))
     (emit ret)
-    (when (and statements (= :expr context)) (emits "})()"))))
+    (emitln ")")))
 
 (defmethod emit :try*
   [{:keys [env try catch name finally]}]
@@ -562,7 +554,7 @@
 (defn emit-let
   [{:keys [bindings expr env]} is-loop]
   (let [context (:context env)]
-    (when (= :expr context) (emits "(function (){"))
+    (emits "(let (")
     (binding [*lexical-renames* (into *lexical-renames*
                                       (when (= :statement context)
                                         (map #(vector
@@ -570,13 +562,24 @@
                                                (gensym (str (:name %) "-")))
                                              bindings)))]
       (doseq [{:keys [init] :as binding} bindings]
-        (emitln "var " (munge binding) " = " init ";"))
-      (when is-loop (emitln "while(true){"))
-      (emits expr)
+        (emitln "(" (munge binding) " " init ")"))
+      (emitln ")")
       (when is-loop
-        (emitln "break;")
-        (emitln "}")))
-    (when (= :expr context) (emits "})()"))))
+        (emitln "(catch 'break")
+        (emitln "(while t")
+        (emitln "(catch 'continue"))
+      (let [rname (gensym)]
+        (emits "(let ((" rname " ")
+        (emits expr)
+        (emitln "))")
+        (if is-loop
+          (do (emits "(throw 'break " rname ")")
+              (emits ")")
+              (emits ")")
+              (emits ")"))
+          (emitln rname))
+        (emitln ")")))
+    (emitln ")")))
 
 (defmethod emit :let [ast]
   (emit-let ast false))
@@ -588,22 +591,22 @@
   [{:keys [frame exprs env]}]
   (let [temps (vec (take (count exprs) (repeatedly gensym)))
         params (:params frame)]
-    (emitln "{")
+    (emits "(let (")
     (dotimes [i (count exprs)]
-      (emitln "var " (temps i) " = " (exprs i) ";"))
+      (emitln "(" (temps i) " " (exprs i) ")"))
+    (emitln ")")
     (dotimes [i (count exprs)]
-      (emitln (munge (params i)) " = " (temps i) ";"))
-    (emitln "continue;")
-    (emitln "}")))
+      (emitln "(setq " (munge (params i)) " " (temps i) ")"))
+    (emitln "(throw 'continue nil)")
+    (emitln ")")))
 
 (defmethod emit :letfn
   [{:keys [bindings expr env]}]
   (let [context (:context env)]
-    (when (= :expr context) (emits "(function (){"))
+    (emits "(labels ((")
     (doseq [{:keys [init] :as binding} bindings]
       (emitln "var " (munge binding) " = " init ";"))
-    (emits expr)
-    (when (= :expr context) (emits "})()"))))
+    (emits expr)))
 
 (defn protocol-prefix [psym]
   (symbol (str (-> (str psym) (.replace \. \$) (.replace \/ \$)) "$")))
@@ -695,7 +698,7 @@
                   (let [fprop (str ".cljel$lang$arity$" (count args))]
                     (emits "(" f fprop " ? " f fprop "(" (comma-sep args) ") : "
                            f ".call(" (comma-sep (cons "null" args)) "))"))
-                  (emits f ".call(" (comma-sep (cons "null" args)) ")"))))))
+                  (emitln "(" f " " (space-sep args) ")"))))))
 
 (defmethod emit :new
   [{:keys [ctor args env]}]
@@ -815,6 +818,7 @@
                 *data-readers* tags/*cljel-data-readers*
                 *position* (atom [0 0])
                 *emitted-provides* (atom #{})]
+        (emitln "(setq lexical-binding t)")
         (loop [forms (forms-seq src)
                ns-name nil
                deps nil]

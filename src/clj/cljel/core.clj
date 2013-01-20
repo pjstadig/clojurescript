@@ -224,18 +224,18 @@
 (defmacro +
   ([] 0)
   ([x] x)
-  ([x y] (list 'js* "(~{} + ~{})" x y))
+  ([x y] (list 'js* "(+ ~{} ~{})" x y))
   ([x y & more] `(+ (+ ~x ~y) ~@more)))
 
 (defmacro -
   ([x] (list 'js* "(- ~{})" x))
-  ([x y] (list 'js* "(~{} - ~{})" x y))
+  ([x y] (list 'js* "(- ~{} ~{})" x y))
   ([x y & more] `(- (- ~x ~y) ~@more)))
 
 (defmacro *
   ([] 1)
   ([x] x)
-  ([x y] (list 'js* "(~{} * ~{})" x y))
+  ([x y] (list 'js* "(* ~{} ~{})" x y))
   ([x y & more] `(* (* ~x ~y) ~@more)))
 
 (defmacro /
@@ -245,22 +245,22 @@
 
 (defmacro <
   ([x] true)
-  ([x y] (bool-expr (list 'js* "(~{} < ~{})" x y)))
+  ([x y] (bool-expr (list 'js* "(< ~{} ~{})" x y)))
   ([x y & more] `(and (< ~x ~y) (< ~y ~@more))))
 
 (defmacro <=
   ([x] true)
-  ([x y] (bool-expr (list 'js* "(~{} <= ~{})" x y)))
+  ([x y] (bool-expr (list 'js* "(<= ~{} ~{})" x y)))
   ([x y & more] `(and (<= ~x ~y) (<= ~y ~@more))))
 
 (defmacro >
   ([x] true)
-  ([x y] (bool-expr (list 'js* "(~{} > ~{})" x y)))
+  ([x y] (bool-expr (list 'js* "(> ~{} ~{})" x y)))
   ([x y & more] `(and (> ~x ~y) (> ~y ~@more))))
 
 (defmacro >=
   ([x] true)
-  ([x y] (bool-expr (list 'js* "(~{} >= ~{})" x y)))
+  ([x y] (bool-expr (list 'js* "(>= ~{} ~{})" x y)))
   ([x y & more] `(and (>= ~x ~y) (>= ~y ~@more))))
 
 (defmacro ==
