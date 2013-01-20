@@ -385,11 +385,10 @@
 (defn emit-fn-method
   [{:keys [type name variadic params expr env recurs max-fixed-arity]}]
   (emit-wrap env
-             (if *emitting-letfn*
-               (emitln "(" name " (" (space-sep (map munge params)) ")")
-               (do (emitln "(lambda (" (space-sep (map munge params)) ")")
-                   (emitln "(labels ((" name " (" (space-sep (map munge params))
-                           ")")))
+             (when-not *emitting-letfn*
+               (emitln "(let ((" name " nil))")
+               (emitln "(fset '" name " "))
+             (emitln"(lambda (" (space-sep (map munge params)) ")")
              (when type
                (emitln "var self__ = this;"))
              (when recurs
@@ -407,11 +406,11 @@
                      (emitln ")"))
                  (emitln rname)))
              (emitln ")")
-             (when (not *emitting-letfn*)
-               (emitln "))")
-               (emitln "(" name " " (space-sep (map munge params)) ")")
-               (emitln ")"))
-             (emitln ")")))
+             (emitln ")")
+             (when-not *emitting-letfn*
+               (emitln ")")
+               (emitln "(function " name ")")
+               (emitln ")"))))
 
 (defn emit-variadic-fn-method
   [{:keys [type name variadic params expr env recurs max-fixed-arity] :as f}]
@@ -604,11 +603,13 @@
 (defmethod emit :letfn
   [{:keys [bindings expr env]}]
   (let [context (:context env)]
-    (emits "(labels (")
+    (emits "(let (")
+    (doseq [{:keys [init] :as binding} bindings]
+      (emitln "(" (munge binding) " nil)"))
+    (emitln ")")
     (binding [*emitting-letfn* true]
       (doseq [{:keys [init] :as binding} bindings]
-        (emitln init)))
-    (emitln ")")
+        (emitln "(fset '" (munge binding) " " init ")")))
     (emits expr)
     (emitln ")")))
 
