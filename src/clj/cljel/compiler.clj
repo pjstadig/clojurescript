@@ -380,11 +380,16 @@
         (emitln "return " delegate-name "(" (string/join ", " params) ");")))
     (emits "})")))
 
+(def ^:dynamic *emitting-letfn* false)
+
 (defn emit-fn-method
   [{:keys [type name variadic params expr env recurs max-fixed-arity]}]
   (emit-wrap env
-             (emitln "(lambda (" (space-sep (map munge params)) ")")
-             (emitln "(labels ((" name " (" (space-sep (map munge params)) ")")
+             (if *emitting-letfn*
+               (emitln "(" name " (" (space-sep (map munge params)) ")")
+               (do (emitln "(lambda (" (space-sep (map munge params)) ")")
+                   (emitln "(labels ((" name " (" (space-sep (map munge params))
+                           ")")))
              (when type
                (emitln "var self__ = this;"))
              (when recurs
@@ -402,9 +407,10 @@
                      (emitln ")"))
                  (emitln rname)))
              (emitln ")")
-             (emitln "))")
-             (emitln "(" name " " (space-sep (map munge params)) ")")
-             (emitln ")")
+             (when (not *emitting-letfn*)
+               (emitln "))")
+               (emitln "(" name " " (space-sep (map munge params)) ")")
+               (emitln ")"))
              (emitln ")")))
 
 (defn emit-variadic-fn-method
@@ -603,10 +609,13 @@
 (defmethod emit :letfn
   [{:keys [bindings expr env]}]
   (let [context (:context env)]
-    (emits "(labels ((")
-    (doseq [{:keys [init] :as binding} bindings]
-      (emitln "var " (munge binding) " = " init ";"))
-    (emits expr)))
+    (emits "(labels (")
+    (binding [*emitting-letfn* true]
+      (doseq [{:keys [init] :as binding} bindings]
+        (emitln init)))
+    (emitln ")")
+    (emits expr)
+    (emitln ")")))
 
 (defn protocol-prefix [psym]
   (symbol (str (-> (str psym) (.replace \. \$) (.replace \/ \$)) "$")))
