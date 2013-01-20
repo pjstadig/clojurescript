@@ -189,7 +189,7 @@
 
 ;; internal - do not use.
 (defmacro coercive-not [x]
-  (bool-expr (list 'js* "(!~{})" x)))
+  (bool-expr (list 'js* "(not ~{})" x)))
 
 ;; internal - do not use.
 (defmacro coercive-not= [x y]
@@ -197,19 +197,19 @@
 
 ;; internal - do not use.
 (defmacro coercive-= [x y]
-  (bool-expr (list 'js* "(~{} == ~{})" x y)))
+  (bool-expr (list 'js* "(equal ~{} ~{})" x y)))
 
 (defmacro true? [x]
-  (bool-expr (list 'js* "~{} === true" x)))
+  (bool-expr (list 'js* "(equal t ~{}" x)))
 
 (defmacro false? [x]
-  (bool-expr (list 'js* "~{} === false" x)))
+  (bool-expr (list 'js* "(equal nil ~{}" x)))
 
 (defmacro undefined? [x]
   (bool-expr (list 'js* "(void 0 === ~{})" x)))
 
 (defmacro identical? [a b]
-  (bool-expr (list 'js* "(~{} === ~{})" a b)))
+  (bool-expr (list 'js* "(eq ~{} ~{})" a b)))
 
 (defmacro aget
   ([a i]
@@ -265,7 +265,7 @@
 
 (defmacro ==
   ([x] true)
-  ([x y] (bool-expr (list 'js* "(~{} === ~{})" x y)))
+  ([x y] (bool-expr (list 'js* "(equal ~{} ~{})" x y)))
   ([x y & more] `(and (== ~x ~y) (== ~y ~@more))))
 
 (defmacro dec [x]
@@ -285,35 +285,35 @@
 
 (defmacro max
   ([x] x)
-  ([x y] (list 'js* "((~{} > ~{}) ? ~{} : ~{})" x y x y))
+  ([x y] (list 'js* "(max ~{} ~{})" x y))
   ([x y & more] `(max (max ~x ~y) ~@more)))
 
 (defmacro min
   ([x] x)
-  ([x y] (list 'js* "((~{} < ~{}) ? ~{} : ~{})" x y x y))
+  ([x y] (list 'js* "(min ~{} ~{})" x y))
   ([x y & more] `(min (min ~x ~y) ~@more)))
 
 (defmacro js-mod [num div]
   (list 'js* "(~{} % ~{})" num div))
 
 (defmacro bit-not [x]
-  (list 'js* "(~ ~{})" x))
+  (list 'js* "(lognot ~{})" x))
 
 (defmacro bit-and
-  ([x y] (list 'js* "(~{} & ~{})" x y))
+  ([x y] (list 'js* "(logand ~{} ~{})" x y))
   ([x y & more] `(bit-and (bit-and ~x ~y) ~@more)))
 
 ;; internal do not use
 (defmacro unsafe-bit-and
-  ([x y] (bool-expr (list 'js* "(~{} & ~{})" x y)))
+  ([x y] (bool-expr (list 'js* "(logand ~{} ~{})" x y)))
   ([x y & more] `(unsafe-bit-and (unsafe-bit-and ~x ~y) ~@more)))
 
 (defmacro bit-or
-  ([x y] (list 'js* "(~{} | ~{})" x y))
+  ([x y] (list 'js* "(logior ~{} ~{})" x y))
   ([x y & more] `(bit-or (bit-or ~x ~y) ~@more)))
 
 (defmacro bit-xor
-  ([x y] (list 'js* "(~{} ^ ~{})" x y))
+  ([x y] (list 'js* "(logxor ~{} ~{})" x y))
   ([x y & more] `(bit-xor (bit-xor ~x ~y) ~@more)))
 
 (defmacro bit-and-not
