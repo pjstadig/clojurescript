@@ -548,7 +548,7 @@
            "(condition-case " ex "\n"
            try
            "(" name " \n"
-;;           "(message (format \"Caught: [%s]\" " ex "))\n"
+           ;; "(message (format \"Caught: [%s]\" " ex "))\n"
            catch "))\n"
            finally ")\n")))
 
