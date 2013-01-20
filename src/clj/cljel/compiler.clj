@@ -709,7 +709,7 @@
 
 (defmethod emit :set!
   [{:keys [target val env]}]
-  (emit-wrap env (emits target " = " val)))
+  (emit-wrap env (emits "(setq " target " " val ")\n")))
 
 (defmethod emit :ns
   [{:keys [name requires uses requires-macros env]}]
