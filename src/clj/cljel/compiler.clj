@@ -1,10 +1,13 @@
-;   Copyright (c) Rich Hickey. All rights reserved.
-;   The use and distribution terms for this software are covered by the
-;   Eclipse Public License 1.0 (http://opensource.org/licenses/eclipse-1.0.php)
-;   which can be found in the file epl-v10.html at the root of this distribution.
-;   By using this software in any fashion, you are agreeing to be bound by
-;   the terms of this license.
-;   You must not remove this notice, or any other, from this software.
+;;;; Copyright © Rich Hickey, Paul Stadig. All rights reserved.
+;;;;
+;;;; The use and distribution terms for this software are covered by the Eclipse
+;;;; Public License 1.0 (http://opensource.org/licenses/eclipse-1.0.php) which
+;;;; can be found in the file epl-v10.html at the root of this distribution.
+;;;;
+;;;; By using this software in any fashion, you are agreeing to be bound by the
+;;;; terms of this license.
+;;;;
+;;;; You must not remove this notice, or any other, from this software.
 
 (set! *warn-on-reflection* true)
 
@@ -43,30 +46,30 @@
 (defn munge
   ([s] (munge s js-reserved))
   ([s reserved]
-    (if (map? s)
-      ; Unshadowing
-      (let [{:keys [name field] :as info} s
-            depth (loop [d 0, {:keys [shadow]} info]
-                    (cond
+     (if (map? s)
+       ;; Unshadowing
+       (let [{:keys [name field] :as info} s
+             depth (loop [d 0, {:keys [shadow]} info]
+                     (cond
                       shadow (recur (inc d) shadow)
                       (@ns-first-segments (str name)) (inc d)
                       :else d))
-            renamed (*lexical-renames* (System/identityHashCode s))
-            munged-name (munge (cond field (str "self__." name)
-                                     renamed renamed
-                                     :else name)
-                               reserved)]
-        (if (or field (zero? depth))
-          munged-name
-          (symbol (str munged-name "__$" depth))))
-      ; String munging
-      (let [ss (string/replace (str s) #"\/(.)" ".$1") ; Division is special
-            ss (apply str (map #(if (reserved %) (str % "$") %)
-                               (string/split ss #"(?<=\.)|(?=\.)")))
-            ms (clojure.lang.Compiler/munge ss)]
-        (if (symbol? s)
-          (symbol ms)
-          ms)))))
+             renamed (*lexical-renames* (System/identityHashCode s))
+             munged-name (munge (cond field (str "self__." name)
+                                      renamed renamed
+                                      :else name)
+                                reserved)]
+         (if (or field (zero? depth))
+           munged-name
+           (symbol (str munged-name "__$" depth))))
+       ;; String munging
+       (let [ss (string/replace (str s) #"\/(.)" ".$1") ; Division is special
+             ss (apply str (map #(if (reserved %) (str % "$") %)
+                                (string/split ss #"(?<=\.)|(?=\.)")))
+             ms (clojure.lang.Compiler/munge ss)]
+         (if (symbol? s)
+           (symbol ms)
+           ms)))))
 
 (defn- comma-sep [xs]
   (interpose "," xs))
@@ -74,10 +77,10 @@
 (defn- escape-char [^Character c]
   (let [cp (.hashCode c)]
     (case cp
-      ; Handle printable escapes before ASCII
+      ;; Handle printable escapes before ASCII
       34 "\\\""
       92 "\\\\"
-      ; Handle non-printable escapes
+      ;; Handle non-printable escapes
       8 "\\b"
       12 "\\f"
       10 "\\n"
@@ -101,16 +104,16 @@
 (defn emits [& xs]
   (doseq [x xs]
     (cond
-      (nil? x) nil
-      (map? x) (emit x)
-      (seq? x) (apply emits x)
-      (fn? x)  (x)
-      :else (do
-              (let [s (print-str x)]
-                (when *position*
-                  (swap! *position* (fn [[line column]]
-                                      [line (+ column (count s))])))
-                (print s)))))
+     (nil? x) nil
+     (map? x) (emit x)
+     (seq? x) (apply emits x)
+     (fn? x)  (x)
+     :else (do
+             (let [s (print-str x)]
+               (when *position*
+                 (swap! *position* (fn [[line column]]
+                                     [line (+ column (count s))])))
+               (print s)))))
   nil)
 
 (defn ^String emit-str [expr]
@@ -119,9 +122,10 @@
 (defn emitln [& xs]
   (apply emits xs)
   ;; Prints column-aligned line number comments; good test of *position*.
-  ;(when *position*
-  ;  (let [[line column] @*position*]
-  ;    (print (apply str (concat (repeat (- 120 column) \space) ["// " (inc line)])))))
+  ;; (when *position*
+  ;;   (let [[line column] @*position*]
+  ;;     (print (apply str (concat (repeat (- 120 column) \space)
+  ;;                               ["// " (inc line)])))))
   (println)
   (when *position*
     (swap! *position* (fn [[line column]]
@@ -139,7 +143,8 @@
 (defmulti emit-constant class)
 (defmethod emit-constant nil [x] (emits "null"))
 (defmethod emit-constant Long [x] (emits x))
-(defmethod emit-constant Integer [x] (emits x)) ; reader puts Integers in metadata
+;; reader puts Integers in metadata
+(defmethod emit-constant Integer [x] (emits x))
 (defmethod emit-constant Double [x] (emits x))
 (defmethod emit-constant String [x]
   (emits (wrap-in-double-quotes (escape-string x))))
@@ -152,18 +157,18 @@
     (emits \/ (.replaceAll (re-matcher #"/" pattern) "\\\\/") \/ flags)))
 
 (defmethod emit-constant clojure.lang.Keyword [x]
-           (emits \" "\\uFDD0" \:
-                  (if (namespace x)
-                    (str (namespace x) "/") "")
-                  (name x)
-                  \"))
+  (emits \" "\\uFDD0" \:
+         (if (namespace x)
+           (str (namespace x) "/") "")
+         (name x)
+         \"))
 
 (defmethod emit-constant clojure.lang.Symbol [x]
-           (emits \" "\\uFDD1" \'
-                  (if (namespace x)
-                    (str (namespace x) "/") "")
-                  (name x)
-                  \"))
+  (emits \" "\\uFDD1" \'
+         (if (namespace x)
+           (str (namespace x) "/") "")
+         (name x)
+         \"))
 
 (defn- emit-meta-constant [x & body]
   (if (meta x)
@@ -178,34 +183,34 @@
 
 (defmethod emit-constant clojure.lang.PersistentList [x]
   (emit-meta-constant x
-    (concat ["cljel.core.list("]
-            (comma-sep (map #(fn [] (emit-constant %)) x))
-            [")"])))
+                      (concat ["cljel.core.list("]
+                              (comma-sep (map #(fn [] (emit-constant %)) x))
+                              [")"])))
 
 (defmethod emit-constant clojure.lang.Cons [x]
   (emit-meta-constant x
-    (concat ["cljel.core.list("]
-            (comma-sep (map #(fn [] (emit-constant %)) x))
-            [")"])))
+                      (concat ["cljel.core.list("]
+                              (comma-sep (map #(fn [] (emit-constant %)) x))
+                              [")"])))
 
 (defmethod emit-constant clojure.lang.IPersistentVector [x]
   (emit-meta-constant x
-    (concat ["cljel.core.vec(["]
-            (comma-sep (map #(fn [] (emit-constant %)) x))
-            ["])"])))
+                      (concat ["cljel.core.vec(["]
+                              (comma-sep (map #(fn [] (emit-constant %)) x))
+                              ["])"])))
 
 (defmethod emit-constant clojure.lang.IPersistentMap [x]
   (emit-meta-constant x
-    (concat ["cljel.core.hash_map("]
-            (comma-sep (map #(fn [] (emit-constant %))
-                            (apply concat x)))
-            [")"])))
+                      (concat ["cljel.core.hash_map("]
+                              (comma-sep (map #(fn [] (emit-constant %))
+                                              (apply concat x)))
+                              [")"])))
 
 (defmethod emit-constant clojure.lang.PersistentHashSet [x]
   (emit-meta-constant x
-    (concat ["cljel.core.set(["]
-            (comma-sep (map #(fn [] (emit-constant %)) x))
-            ["])"])))
+                      (concat ["cljel.core.set(["]
+                              (comma-sep (map #(fn [] (emit-constant %)) x))
+                              ["])"])))
 
 (defmacro emit-wrap [env & body]
   `(let [env# ~env]
@@ -227,7 +232,7 @@
 (defmethod emit :meta
   [{:keys [expr meta env]}]
   (emit-wrap env
-    (emits "cljel.core.with_meta(" expr "," meta ")")))
+             (emits "cljel.core.with_meta(" expr "," meta ")")))
 
 (def ^:private array-map-threshold 16)
 (def ^:private obj-map-threshold 32)
@@ -235,48 +240,49 @@
 (defmethod emit :map
   [{:keys [env simple-keys? keys vals]}]
   (emit-wrap env
-    (cond
-      (zero? (count keys))
-      (emits "cljel.core.ObjMap.EMPTY")
+             (cond
+              (zero? (count keys))
+              (emits "cljel.core.ObjMap.EMPTY")
 
-      (and simple-keys? (<= (count keys) obj-map-threshold))
-      (emits "cljel.core.ObjMap.fromObject(["
-             (comma-sep keys) ; keys
-             "],{"
-             (comma-sep (map (fn [k v]
-                               (with-out-str (emit k) (print ":") (emit v)))
-                             keys vals)) ; js obj
-             "})")
+              (and simple-keys? (<= (count keys) obj-map-threshold))
+              (emits "cljel.core.ObjMap.fromObject(["
+                     (comma-sep keys) ; keys
+                     "],{"
+                     (comma-sep (map (fn [k v]
+                                       (with-out-str
+                                         (emit k) (print ":") (emit v)))
+                                     keys vals)) ; js obj
+                     "})")
 
-      (<= (count keys) array-map-threshold)
-      (emits "cljel.core.PersistentArrayMap.fromArrays(["
-             (comma-sep keys)
-             "],["
-             (comma-sep vals)
-             "])")
+              (<= (count keys) array-map-threshold)
+              (emits "cljel.core.PersistentArrayMap.fromArrays(["
+                     (comma-sep keys)
+                     "],["
+                     (comma-sep vals)
+                     "])")
 
-      :else
-      (emits "cljel.core.PersistentHashMap.fromArrays(["
-             (comma-sep keys)
-             "],["
-             (comma-sep vals)
-             "])"))))
+              :else
+              (emits "cljel.core.PersistentHashMap.fromArrays(["
+                     (comma-sep keys)
+                     "],["
+                     (comma-sep vals)
+                     "])"))))
 
 (defmethod emit :vector
   [{:keys [items env]}]
   (emit-wrap env
-    (if (empty? items)
-      (emits "cljel.core.PersistentVector.EMPTY")
-      (emits "cljel.core.PersistentVector.fromArray(["
-             (comma-sep items) "], true)"))))
+             (if (empty? items)
+               (emits "cljel.core.PersistentVector.EMPTY")
+               (emits "cljel.core.PersistentVector.fromArray(["
+                      (comma-sep items) "], true)"))))
 
 (defmethod emit :set
   [{:keys [items env]}]
   (emit-wrap env
-    (if (empty? items)
-      (emits "cljel.core.PersistentHashSet.EMPTY")
-      (emits "cljel.core.PersistentHashSet.fromArray(["
-             (comma-sep items) "])"))))
+             (if (empty? items)
+               (emits "cljel.core.PersistentHashSet.EMPTY")
+               (emits "cljel.core.PersistentHashSet.fromArray(["
+                      (comma-sep items) "])"))))
 
 (defmethod emit :constant
   [{:keys [form env]}]
@@ -315,7 +321,8 @@
   (let [context (:context env)
         checked (not (or unchecked (safe-test? test)))]
     (if (= :expr context)
-      (emits "(" (when checked "cljel.core.truth_") "(" test ")?" then ":" else ")")
+      (emits "(" (when checked "cljel.core.truth_") "(" test ")?" then ":" else
+             ")")
       (do
         (if checked
           (emitln "if(cljel.core.truth_(" test "))")
@@ -386,7 +393,8 @@
 (defn emit-fn-method
   [{:keys [type name variadic params expr env recurs max-fixed-arity]}]
   (emit-wrap env
-             (emitln "(function " (munge name) "(" (comma-sep (map munge params)) "){")
+             (emitln "(function " (munge name) "("
+                     (comma-sep (map munge params)) "){")
              (when type
                (emitln "var self__ = this;"))
              (when recurs (emitln "while(true){"))
@@ -404,7 +412,8 @@
                    params (map munge params)
                    delegate-name (str mname "__delegate")]
                (emitln "(function() { ")
-               (emitln "var " delegate-name " = function (" (comma-sep params) "){")
+               (emitln "var " delegate-name " = function (" (comma-sep params)
+                       "){")
                (when recurs (emitln "while(true){"))
                (emits expr)
                (when recurs
@@ -413,17 +422,22 @@
                (emitln "};")
 
                (emitln "var " mname " = function (" (comma-sep
-                                                      (if variadic
-                                                        (concat (butlast params) ['var_args])
-                                                        params)) "){")
+                                                     (if variadic
+                                                       (concat (butlast params)
+                                                               ['var_args])
+                                                       params)) "){")
                (when type
                  (emitln "var self__ = this;"))
                (when variadic
                  (emitln "var " (last params) " = null;")
                  (emitln "if (goog.isDef(var_args)) {")
-                 (emitln "  " (last params) " = cljel.core.array_seq(Array.prototype.slice.call(arguments, " (dec (count params)) "),0);")
+                 (emitln "  " (last params)
+                         " = cljel.core.array_seq("
+                         "Array.prototype.slice.call(arguments, "
+                         (dec (count params)) "),0);")
                  (emitln "} "))
-               (emitln "return " delegate-name ".call(" (string/join ", " (cons "this" params)) ");")
+               (emitln "return " delegate-name ".call("
+                       (string/join ", " (cons "this" params)) ");")
                (emitln "};")
 
                (emitln mname ".cljel$lang$maxFixedArity = " max-fixed-arity ";")
@@ -438,16 +452,17 @@
   [{:keys [name env methods max-fixed-arity variadic recur-frames loop-lets]}]
   ;;fn statements get erased, serve no purpose and can pollute scope if named
   (when-not (= :statement (:context env))
-    (let [loop-locals (->> (concat (mapcat :params (filter #(and % @(:flag %)) recur-frames))
+    (let [loop-locals (->> (concat (mapcat :params (filter #(and % @(:flag %))
+                                                           recur-frames))
                                    (mapcat :params loop-lets))
                            (map munge)
                            seq)]
       (when loop-locals
         (when (= :return (:context env))
-            (emits "return "))
+          (emits "return "))
         (emitln "((function (" (comma-sep (map munge loop-locals)) "){")
         (when-not (= :return (:context env))
-            (emits "return ")))
+          (emits "return ")))
       (if (= 1 (count methods))
         (if variadic
           (emit-variadic-fn-method (assoc (first methods) :name name))
@@ -457,10 +472,11 @@
               mname (munge name)
               maxparams (map munge (apply max-key count (map :params methods)))
               mmap (into {}
-                     (map (fn [method]
-                            [(munge (symbol (str mname "__" (count (:params method)))))
-                             method])
-                          methods))
+                         (map (fn [method]
+                                [(munge (symbol (str mname "__"
+                                                     (count (:params method)))))
+                                 method])
+                              methods))
               ms (sort-by #(-> % second :params count) (seq mmap))]
           (when (= :return (:context env))
             (emits "return "))
@@ -472,9 +488,10 @@
               (emit-variadic-fn-method meth)
               (emit-fn-method meth))
             (emitln ";"))
-            (emitln mname " = function(" (comma-sep (if variadic
-                                                      (concat (butlast maxparams) ['var_args])
-                                                      maxparams)) "){")
+          (emitln mname " = function(" (comma-sep (if variadic
+                                                    (concat (butlast maxparams)
+                                                            ['var_args])
+                                                    maxparams)) "){")
           (when variadic
             (emitln "var " (last maxparams) " = var_args;"))
           (emitln "switch(arguments.length){")
@@ -484,22 +501,31 @@
                   (emitln "return " n ".cljel$lang$arity$variadic("
                           (comma-sep (butlast maxparams))
                           (when (> (count maxparams) 1) ", ")
-                          "cljel.core.array_seq(arguments, " max-fixed-arity "));"))
+                          "cljel.core.array_seq(arguments, " max-fixed-arity
+                          "));"))
               (let [pcnt (count (:params meth))]
                 (emitln "case " pcnt ":")
-                (emitln "return " n ".call(this" (if (zero? pcnt) nil
-                                                     (list "," (comma-sep (take pcnt maxparams)))) ");"))))
+                (emitln "return " n ".call(this"
+                        (if (zero? pcnt) nil
+                            (list ","
+                                  (comma-sep
+                                   (take pcnt maxparams))))
+                        ");"))))
           (emitln "}")
           (emitln "throw(new Error('Invalid arity: ' + arguments.length));")
           (emitln "};")
           (when variadic
             (emitln mname ".cljel$lang$maxFixedArity = " max-fixed-arity ";")
-            (emitln mname ".cljel$lang$applyTo = " (some #(let [[n m] %] (when (:variadic m) n)) ms) ".cljel$lang$applyTo;"))
+            (emitln mname ".cljel$lang$applyTo = "
+                    (some #(let [[n m] %] (when (:variadic m) n))
+                          ms)
+                    ".cljel$lang$applyTo;"))
           (when has-name?
             (doseq [[n meth] ms]
               (let [c (count (:params meth))]
                 (if (:variadic meth)
-                  (emitln mname ".cljel$lang$arity$variadic = " n ".cljel$lang$arity$variadic;")
+                  (emitln mname ".cljel$lang$arity$variadic = " n
+                          ".cljel$lang$arity$variadic;")
                   (emitln mname ".cljel$lang$arity$" c " = " n ";")))))
           (emitln "return " mname ";")
           (emitln "})()")))
@@ -526,7 +552,8 @@
         (when name
           (emits "catch (" (munge name) "){" catch "}"))
         (when finally
-          (assert (not= :constant (:op finally)) "finally block cannot contain constant")
+          (assert (not= :constant (:op finally))
+                  "finally block cannot contain constant")
           (emits "finally {" finally "}"))
         (when (= :expr context)
           (emits "})()")))
@@ -538,8 +565,9 @@
     (when (= :expr context) (emits "(function (){"))
     (binding [*lexical-renames* (into *lexical-renames*
                                       (when (= :statement context)
-                                        (map #(vector (System/identityHashCode %)
-                                                      (gensym (str (:name %) "-")))
+                                        (map #(vector
+                                               (System/identityHashCode %)
+                                               (gensym (str (:name %) "-")))
                                              bindings)))]
       (doseq [{:keys [init] :as binding} bindings]
         (emitln "var " (munge binding) " = " init ";"))
@@ -592,7 +620,8 @@
                       (or ana/*cljel-static-fns*
                           (:protocol-inline env))
                       (or (= protocol tag)
-                          (when-let [ps (:protocols (ana/resolve-existing-var (dissoc env :locals) tag))]
+                          (when-let [ps (:protocols (ana/resolve-existing-var
+                                                     (dissoc env :locals) tag))]
                             (ps protocol)))))
         opt-not? (and (= (:name info) 'cljel.core/not)
                       (= (infer-tag (first (:args expr))) 'boolean))
@@ -619,7 +648,9 @@
              ;; direct dispatch to variadic case
              (and variadic? (> arity mfa))
              [(update-in f [:info :name]
-                             (fn [name] (symbol (str (munge name) ".cljel$lang$arity$variadic"))))
+                         (fn [name]
+                           (symbol (str (munge name)
+                                        ".cljel$lang$arity$variadic"))))
               {:max-fixed-arity mfa}]
 
              ;; direct dispatch to specific arity case
@@ -627,36 +658,44 @@
              (let [arities (map count mps)]
                (if (some #{arity} arities)
                  [(update-in f [:info :name]
-                             (fn [name] (symbol (str (munge name) ".cljel$lang$arity$" arity)))) nil]
+                             (fn [name]
+                               (symbol (str (munge name)
+                                            ".cljel$lang$arity$" arity))))
+                  nil]
                  [f nil]))))
           [f nil])]
     (emit-wrap env
-      (cond
-       opt-not?
-       (emits "!(" (first args) ")")
+               (cond
+                opt-not?
+                (emits "!(" (first args) ")")
 
-       proto?
-       (let [pimpl (str (munge (protocol-prefix protocol))
-                        (munge (name (:name info))) "$arity$" (count args))]
-         (emits (first args) "." pimpl "(" (comma-sep args) ")"))
+                proto?
+                (let [pimpl (str (munge (protocol-prefix protocol))
+                                 (munge (name (:name info))) "$arity$"
+                                 (count args))]
+                  (emits (first args) "." pimpl "(" (comma-sep args) ")"))
 
-       keyword?
-       (emits "(new cljel.core.Keyword(" f ")).call(" (comma-sep (cons "null" args)) ")")
-       
-       variadic-invoke
-       (let [mfa (:max-fixed-arity variadic-invoke)]
-        (emits f "(" (comma-sep (take mfa args))
-               (when-not (zero? mfa) ",")
-               "cljel.core.array_seq([" (comma-sep (drop mfa args)) "], 0))"))
-       
-       (or fn? js? goog?)
-       (emits f "(" (comma-sep args)  ")")
-       
-       :else
-       (if (and ana/*cljel-static-fns* (= (:op f) :var))
-         (let [fprop (str ".cljel$lang$arity$" (count args))]
-           (emits "(" f fprop " ? " f fprop "(" (comma-sep args) ") : " f ".call(" (comma-sep (cons "null" args)) "))"))
-         (emits f ".call(" (comma-sep (cons "null" args)) ")"))))))
+                keyword?
+                (emits "(new cljel.core.Keyword(" f ")).call("
+                       (comma-sep (cons "null" args))
+                       ")")
+
+                variadic-invoke
+                (let [mfa (:max-fixed-arity variadic-invoke)]
+                  (emits f "(" (comma-sep (take mfa args))
+                         (when-not (zero? mfa) ",")
+                         "cljel.core.array_seq([" (comma-sep (drop mfa args))
+                         "], 0))"))
+
+                (or fn? js? goog?)
+                (emits f "(" (comma-sep args)  ")")
+
+                :else
+                (if (and ana/*cljel-static-fns* (= (:op f) :var))
+                  (let [fprop (str ".cljel$lang$arity$" (count args))]
+                    (emits "(" f fprop " ? " f fprop "(" (comma-sep args) ") : "
+                           f ".call(" (comma-sep (cons "null" args)) "))"))
+                  (emits f ".call(" (comma-sep (cons "null" args)) ")"))))))
 
 (defmethod emit :new
   [{:keys [ctor args env]}]
@@ -784,11 +823,13 @@
                   ast (ana/analyze env (first forms))]
               (do (emit ast)
                   (if (= (:op ast) :ns)
-                    (recur (rest forms) (:name ast) (merge (:uses ast) (:requires ast)))
+                    (recur (rest forms) (:name ast) (merge (:uses ast)
+                                                           (:requires ast)))
                     (recur (rest forms) ns-name deps))))
             {:ns (or ns-name 'cljel.user)
              :provides [ns-name]
-             :requires (if (= ns-name 'cljel.core) (set (vals deps)) (conj (set (vals deps)) 'cljel.core))
+             :requires (if (= ns-name 'cljel.core) (set (vals deps))
+                           (conj (set (vals deps)) 'cljel.core))
              :file dest}))))))
 
 (defn requires-compilation?
@@ -839,7 +880,8 @@
            (do (mkdirs dest-file)
                (compile-file* src-file dest-file))
            (parse-ns src-file dest-file))
-         (throw (java.io.FileNotFoundException. (str "The file " src " does not exist.")))))))
+         (throw (java.io.FileNotFoundException.
+                 (str "The file " src " does not exist.")))))))
 
 (defn path-seq
   [file-str]
@@ -888,7 +930,12 @@
               output-files []]
          (if (seq cljel-files)
            (let [cljel-file (first cljel-files)
-                 output-file ^java.io.File (to-target-file src-dir-file target-dir cljel-file)
+                 output-file ^java.io.File (to-target-file src-dir-file
+                                                           target-dir
+                                                           cljel-file)
                  ns-info (compile-file cljel-file output-file)]
-             (recur (rest cljel-files) (conj output-files (assoc ns-info :file-name (.getPath output-file)))))
+             (recur (rest cljel-files)
+                    (conj output-files
+                          (assoc ns-info
+                            :file-name (.getPath output-file)))))
            output-files)))))
