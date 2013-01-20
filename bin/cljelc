@@ -1,0 +1,20 @@
+#!/bin/sh
+
+# Compile a single cljel file or a directory of cljel files into a
+# single JavaScript file.
+
+if [ "$CLOJURESCRIPT_HOME" = "" ]; then
+  CLOJURESCRIPT_HOME="`dirname $0`/.."
+fi
+
+CLJELC_CP=''
+for next in lib/*: src/clj: src/cljel: test/cljel; do
+  CLJELC_CP="${CLJELC_CP}${CLOJURESCRIPT_HOME}/${next}"
+done
+
+if test "$#" -eq 0
+then
+  echo 'Usage: cljelc <file-or-dir>'
+else
+  java -server -cp "$CLJELC_CP" clojure.main "$CLOJURESCRIPT_HOME/bin/cljelc.clj" "$@"
+fi
