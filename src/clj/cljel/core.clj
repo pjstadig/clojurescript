@@ -240,7 +240,7 @@
 
 (defmacro /
   ([x] `(/ 1 ~x))
-  ([x y] (list 'js* "(~{} / ~{})" x y))
+  ([x y] (list 'js* "(/ ~{} ~{})" x y))
   ([x y & more] `(/ (/ ~x ~y) ~@more)))
 
 (defmacro <
