@@ -1,10 +1,13 @@
-;   Copyright (c) Rich Hickey. All rights reserved.
-;   The use and distribution terms for this software are covered by the
-;   Eclipse Public License 1.0 (http://opensource.org/licenses/eclipse-1.0.php)
-;   which can be found in the file epl-v10.html at the root of this distribution.
-;   By using this software in any fashion, you are agreeing to be bound by
-;   the terms of this license.
-;   You must not remove this notice, or any other, from this software.
+;;;; Copyright © Rich Hickey, Paul Stadig. All rights reserved.
+;;;;
+;;;; The use and distribution terms for this software are covered by the Eclipse
+;;;; Public License 1.0 (http://opensource.org/licenses/eclipse-1.0.php) which
+;;;; can be found in the file epl-v10.html at the root of this distribution.
+;;;;
+;;;; By using this software in any fashion, you are agreeing to be bound by the
+;;;; terms of this license.
+;;;;
+;;;; You must not remove this notice, or any other, from this software.
 
 (ns cljel.core
   (:refer-clojure :exclude [-> ->> .. amap and areduce alength aclone assert binding bound-fn case comment cond condp
@@ -35,82 +38,82 @@
                  :imported)))
 
 (import-macros clojure.core
- [-> ->> ..  and assert comment cond
-  declare defn defn-
-  doto
-  extend-protocol fn for
-  if-let if-not letfn
-  memfn or
-  when when-first when-let when-not while])
+               [-> ->> ..  and assert comment cond
+                declare defn defn-
+                doto
+                extend-protocol fn for
+                if-let if-not letfn
+                memfn or
+                when when-first when-let when-not while])
 
 (defmacro ^{:private true} assert-args [fnname & pairs]
   `(do (when-not ~(first pairs)
          (throw (IllegalArgumentException.
-                  ~(core/str fnname " requires " (second pairs)))))
-     ~(core/let [more (nnext pairs)]
-        (when more
-          (list* `assert-args fnname more)))))
+                 ~(core/str fnname " requires " (second pairs)))))
+       ~(core/let [more (nnext pairs)]
+                  (when more
+                    (list* `assert-args fnname more)))))
 
 (defn destructure [bindings]
   (core/let [bents (partition 2 bindings)
-         pb (fn pb [bvec b v]
-              (core/let [pvec
-                     (fn [bvec b val]
-                       (core/let [gvec (gensym "vec__")]
-                         (core/loop [ret (-> bvec (conj gvec) (conj val))
-                                     n 0
-                                     bs b
-                                     seen-rest? false]
-                           (if (seq bs)
-                             (core/let [firstb (first bs)]
-                               (cond
-                                 (= firstb '&) (recur (pb ret (second bs) (list `nthnext gvec n))
-                                                      n
-                                                      (nnext bs)
-                                                      true)
-                                 (= firstb :as) (pb ret (second bs) gvec)
-                                 :else (if seen-rest?
-                                         (throw (new Exception "Unsupported binding form, only :as can follow & parameter"))
-                                         (recur (pb ret firstb  (list `nth gvec n nil))
-                                                (core/inc n)
-                                                (next bs)
-                                                seen-rest?))))
-                             ret))))
-                     pmap
-                     (fn [bvec b v]
-                       (core/let [gmap (gensym "map__")
-                                  defaults (:or b)]
-                         (core/loop [ret (-> bvec (conj gmap) (conj v)
-                                             (conj gmap) (conj `(if (seq? ~gmap) (apply hash-map ~gmap) ~gmap))
-                                             ((fn [ret]
-                                                (if (:as b)
-                                                  (conj ret (:as b) gmap)
-                                                  ret))))
-                                     bes (reduce
-                                          (fn [bes entry]
-                                            (reduce #(assoc %1 %2 ((val entry) %2))
-                                                    (dissoc bes (key entry))
-                                                    ((key entry) bes)))
-                                          (dissoc b :as :or)
-                                          {:keys #(keyword (core/str %)), :strs core/str, :syms #(list `quote %)})]
-                           (if (seq bes)
-                             (core/let [bb (key (first bes))
-                                        bk (val (first bes))
-                                        has-default (contains? defaults bb)]
-                               (recur (pb ret bb (if has-default
-                                                   (list `get gmap bk (defaults bb))
-                                                   (list `get gmap bk)))
-                                      (next bes)))
-                             ret))))]
-                    (cond
-                      (symbol? b) (-> bvec (conj b) (conj v))
-                      (vector? b) (pvec bvec b v)
-                      (map? b) (pmap bvec b v)
-                      :else (throw (new Exception (core/str "Unsupported binding form: " b))))))
-         process-entry (fn [bvec b] (pb bvec (first b) (second b)))]
-        (if (every? symbol? (map first bents))
-          bindings
-          (reduce process-entry [] bents))))
+             pb (fn pb [bvec b v]
+                  (core/let [pvec
+                             (fn [bvec b val]
+                               (core/let [gvec (gensym "vec__")]
+                                         (core/loop [ret (-> bvec (conj gvec) (conj val))
+                                                     n 0
+                                                     bs b
+                                                     seen-rest? false]
+                                                    (if (seq bs)
+                                                      (core/let [firstb (first bs)]
+                                                                (cond
+                                                                 (= firstb '&) (recur (pb ret (second bs) (list `nthnext gvec n))
+                                                                                      n
+                                                                                      (nnext bs)
+                                                                                      true)
+                                                                 (= firstb :as) (pb ret (second bs) gvec)
+                                                                 :else (if seen-rest?
+                                                                         (throw (new Exception "Unsupported binding form, only :as can follow & parameter"))
+                                                                         (recur (pb ret firstb  (list `nth gvec n nil))
+                                                                                (core/inc n)
+                                                                                (next bs)
+                                                                                seen-rest?))))
+                                                      ret))))
+                             pmap
+                             (fn [bvec b v]
+                               (core/let [gmap (gensym "map__")
+                                          defaults (:or b)]
+                                         (core/loop [ret (-> bvec (conj gmap) (conj v)
+                                                             (conj gmap) (conj `(if (seq? ~gmap) (apply hash-map ~gmap) ~gmap))
+                                                             ((fn [ret]
+                                                                (if (:as b)
+                                                                  (conj ret (:as b) gmap)
+                                                                  ret))))
+                                                     bes (reduce
+                                                          (fn [bes entry]
+                                                            (reduce #(assoc %1 %2 ((val entry) %2))
+                                                                    (dissoc bes (key entry))
+                                                                    ((key entry) bes)))
+                                                          (dissoc b :as :or)
+                                                          {:keys #(keyword (core/str %)), :strs core/str, :syms #(list `quote %)})]
+                                                    (if (seq bes)
+                                                      (core/let [bb (key (first bes))
+                                                                 bk (val (first bes))
+                                                                 has-default (contains? defaults bb)]
+                                                                (recur (pb ret bb (if has-default
+                                                                                    (list `get gmap bk (defaults bb))
+                                                                                    (list `get gmap bk)))
+                                                                       (next bes)))
+                                                      ret))))]
+                            (cond
+                             (symbol? b) (-> bvec (conj b) (conj v))
+                             (vector? b) (pvec bvec b v)
+                             (map? b) (pmap bvec b v)
+                             :else (throw (new Exception (core/str "Unsupported binding form: " b))))))
+             process-entry (fn [bvec b] (pb bvec (first b) (second b)))]
+            (if (every? symbol? (map first bents))
+              bindings
+              (reduce process-entry [] bents))))
 
 (defmacro let
   "binding => binding-form init-expr
@@ -120,8 +123,8 @@
   therein."
   [bindings & body]
   (assert-args
-     (vector? bindings) "a vector for its binding"
-     (even? (count bindings)) "an even number of forms in binding vector")
+   (vector? bindings) "a vector for its binding"
+   (even? (count bindings)) "an even number of forms in binding vector")
   `(let* ~(destructure bindings) ~@body))
 
 (defmacro loop
@@ -129,24 +132,24 @@
   the binding-forms are bound to their respective init-exprs or parts
   therein. Acts as a recur target."
   [bindings & body]
-    (assert-args
-      (vector? bindings) "a vector for its binding"
-      (even? (count bindings)) "an even number of forms in binding vector")
-    (let [db (destructure bindings)]
-      (if (= db bindings)
-        `(loop* ~bindings ~@body)
-        (let [vs (take-nth 2 (drop 1 bindings))
-              bs (take-nth 2 bindings)
-              gs (map (fn [b] (if (symbol? b) b (gensym))) bs)
-              bfs (reduce (fn [ret [b v g]]
-                            (if (symbol? b)
-                              (conj ret g v)
-                              (conj ret g v b g)))
-                          [] (map vector bs vs gs))]
-          `(let ~bfs
-             (loop* ~(vec (interleave gs gs))
-               (let ~(vec (interleave bs gs))
-                 ~@body)))))))
+  (assert-args
+   (vector? bindings) "a vector for its binding"
+   (even? (count bindings)) "an even number of forms in binding vector")
+  (let [db (destructure bindings)]
+    (if (= db bindings)
+      `(loop* ~bindings ~@body)
+      (let [vs (take-nth 2 (drop 1 bindings))
+            bs (take-nth 2 bindings)
+            gs (map (fn [b] (if (symbol? b) b (gensym))) bs)
+            bfs (reduce (fn [ret [b v g]]
+                          (if (symbol? b)
+                            (conj ret g v)
+                            (conj ret g v b g)))
+                        [] (map vector bs vs gs))]
+        `(let ~bfs
+           (loop* ~(vec (interleave gs gs))
+                  (let ~(vec (interleave bs gs))
+                    ~@body)))))))
 
 (def fast-path-protocols
   "protocol fqn -> [partition number, bit]"
@@ -176,7 +179,7 @@
   (let [strs (->> (repeat (count xs) "cljel.core.str(~{})")
                   (interpose ",")
                   (apply core/str))]
-   (concat (list 'js* (core/str "[" strs "].join('')")) xs)))
+    (concat (list 'js* (core/str "[" strs "].join('')")) xs)))
 
 (defn bool-expr [e]
   (vary-meta e assoc :tag 'boolean))
@@ -213,7 +216,7 @@
      (list 'js* "(~{}[~{}])" a i))
   ([a i & idxs]
      (let [astr (apply core/str (repeat (count idxs) "[~{}]"))]
-      `(~'js* ~(core/str "(~{}[~{}]" astr ")") ~a ~i ~@idxs))))
+       `(~'js* ~(core/str "(~{}[~{}]" astr ")") ~a ~i ~@idxs))))
 
 (defmacro aset [a i v]
   (list 'js* "(~{}[~{}] = ~{})" a i v))
@@ -398,14 +401,14 @@
   (core/str (-> (core/str psym) (.replace \. \$) (.replace \/ \$)) "$"))
 
 (def #^:private base-type
-     {nil "null"
-      'object "object"
-      'string "string"
-      'number "number"
-      'array "array"
-      'function "function"
-      'boolean "boolean"
-      'default "_"})
+  {nil "null"
+   'object "object"
+   'string "string"
+   'number "number"
+   'array "array"
+   'function "function"
+   'boolean "boolean"
+   'default "_"})
 
 (defmacro reify [& impls]
   (let [t      (gensym "t")
@@ -448,16 +451,16 @@
                                 (if cljel.analyzer/*cljel-warn-on-undeclared*
                                   (if-let [var (cljel.analyzer/resolve-existing-var (dissoc &env :locals) %)]
                                     (do
-                                     (when-not (:protocol-symbol var)
-                                       (cljel.analyzer/warning &env
-                                         (core/str "WARNING: Symbol " % " is not a protocol")))
-                                     (when (and cljel.analyzer/*cljel-warn-protocol-deprecated*
-                                                (-> var :deprecated)
-                                                (not (-> % meta :deprecation-nowarn)))
-                                       (cljel.analyzer/warning &env
-                                         (core/str "WARNING: Protocol " % " is deprecated"))))
+                                      (when-not (:protocol-symbol var)
+                                        (cljel.analyzer/warning &env
+                                                                (core/str "WARNING: Symbol " % " is not a protocol")))
+                                      (when (and cljel.analyzer/*cljel-warn-protocol-deprecated*
+                                                 (-> var :deprecated)
+                                                 (not (-> % meta :deprecation-nowarn)))
+                                        (cljel.analyzer/warning &env
+                                                                (core/str "WARNING: Protocol " % " is deprecated"))))
                                     (cljel.analyzer/warning &env
-                                      (core/str "WARNING: Can't resolve protocol symbol " %)))))
+                                                            (core/str "WARNING: Can't resolve protocol symbol " %)))))
         skip-flag (set (-> tsym meta :skip-protocol-flag))]
     (if (base-type tsym)
       (let [t (base-type tsym)
@@ -552,30 +555,30 @@
          (recur (-> ret
                     (conj (first s))
                     (into
-                      (reduce (fn [v [f sigs]]
-                                (conj v (vary-meta (cons f (map #(cons (second %) (nnext %)) sigs))
-                                                   assoc :cljel.analyzer/type t
-                                                         :cljel.analyzer/fields fields
-                                                         :protocol-impl true
-                                                         :protocol-inline inline)))
-                              []
-                              (group-by first (take-while seq? (next s))))))
+                     (reduce (fn [v [f sigs]]
+                               (conj v (vary-meta (cons f (map #(cons (second %) (nnext %)) sigs))
+                                                  assoc :cljel.analyzer/type t
+                                                  :cljel.analyzer/fields fields
+                                                  :protocol-impl true
+                                                  :protocol-inline inline)))
+                             []
+                             (group-by first (take-while seq? (next s))))))
                 (drop-while seq? (next s)))
          ret))))
 
 (defn collect-protocols [impls env]
   (->> impls
-      (filter symbol?)
-      (map #(:name (cljel.analyzer/resolve-var (dissoc env :locals) %)))
-      (into #{})))
+       (filter symbol?)
+       (map #(:name (cljel.analyzer/resolve-var (dissoc env :locals) %)))
+       (into #{})))
 
 (defmacro deftype [t fields & impls]
   (let [r (:name (cljel.analyzer/resolve-var (dissoc &env :locals) t))
         [fpps pmasks] (prepare-protocol-masks &env t impls)
         protocols (collect-protocols impls &env)
         t (vary-meta t assoc
-            :protocols protocols
-            :skip-protocol-flag fpps) ]
+                     :protocols protocols
+                     :skip-protocol-flag fpps) ]
     (if (seq impls)
       `(do
          (deftype* ~t ~fields ~pmasks)
@@ -660,8 +663,8 @@
           [fpps pmasks] (prepare-protocol-masks env tagname impls)
           protocols (collect-protocols impls env)
           tagname (vary-meta tagname assoc
-                    :protocols protocols
-                    :skip-protocol-flag fpps)]
+                             :protocols protocols
+                             :skip-protocol-flag fpps)]
       `(do
          (~'defrecord* ~tagname ~hinted-fields ~pmasks)
          (extend-type ~tagname ~@(dt->et tagname impls fields true))))))
@@ -676,9 +679,9 @@
 (defn- build-map-factory
   [rsym rname fields]
   (let [fn-name (symbol (core/str 'map-> rsym))
-	ms (gensym)
-	ks (map keyword fields)
-	getters (map (fn [k] `(~k ~ms)) ks)]
+        ms (gensym)
+        ks (map keyword fields)
+        getters (map (fn [k] `(~k ~ms)) ks)]
     `(defn ~fn-name
        [~ms]
        (new ~rname ~@getters nil (dissoc ~ms ~@ks)))))
@@ -772,14 +775,14 @@
     (cljel.analyzer/confirm-bindings &env names)
     `(let [~@(interleave tempnames names)]
        (try
-        ~@(map
-           (fn [[k v]] (list 'set! k v))
-           binds)
-        ~@body
-        (finally
          ~@(map
             (fn [[k v]] (list 'set! k v))
-            resets))))))
+            binds)
+         ~@body
+         (finally
+          ~@(map
+             (fn [[k v]] (list 'set! k v))
+             resets))))))
 
 (defmacro condp
   "Takes a binary predicate, an expression, and a set of clauses.
@@ -807,8 +810,8 @@
         gexpr (gensym "expr__")
         emit (fn emit [pred expr args]
                (let [[[a b c :as clause] more]
-                       (split-at (if (= :>> (second args)) 3 2) args)
-                       n (count clause)]
+                     (split-at (if (= :>> (second args)) 3 2) args)
+                     n (count clause)]
                  (cond
                   (= 0 n) `(throw (js/Error. (core/str "No matching clause: " ~expr)))
                   (= 1 n) a
@@ -828,14 +831,14 @@
                   (last clauses)
                   `(throw (js/Error. (core/str "No matching clause: " ~e))))
         assoc-test (fn assoc-test [m test expr]
-                         (if (contains? m test)
-                           (throw (clojure.core/IllegalArgumentException.
-                                   (core/str "Duplicate case test constant '"
-                                             test "'"
-                                             (when (:line &env)
-                                               (core/str " on line " (:line &env) " "
-                                                         cljel.analyzer/*cljel-file*)))))
-                           (assoc m test expr)))
+                     (if (contains? m test)
+                       (throw (clojure.core/IllegalArgumentException.
+                               (core/str "Duplicate case test constant '"
+                                         test "'"
+                                         (when (:line &env)
+                                           (core/str " on line " (:line &env) " "
+                                                     cljel.analyzer/*cljel-file*)))))
+                       (assoc m test expr)))
         pairs (reduce (fn [m [test expr]]
                         (cond
                          (seq? test) (reduce (fn [m test]
@@ -848,8 +851,8 @@
                          :else (assoc-test m test expr)))
                       {} (partition 2 clauses))
         esym (gensym)]
-   `(let [~esym ~e]
-      (cond
+    `(let [~esym ~e]
+       (cond
         ~@(mapcat (fn [[m c]] `((cljel.core/= ~m ~esym) ~c)) pairs)
         :else ~default))))
 
@@ -909,8 +912,8 @@
   (take 100 (for [x (range 100000000) y (range 1000000) :while (< y x)]  [x y]))"
   [seq-exprs body-expr]
   (assert-args for
-     (vector? seq-exprs) "a vector for its binding"
-     (even? (count seq-exprs)) "an even number of forms in binding vector")
+               (vector? seq-exprs) "a vector for its binding"
+               (even? (count seq-exprs)) "an even number of forms in binding vector")
   (let [to-groups (fn [seq-exprs]
                     (reduce (fn [groups [k v]]
                               (if (keyword? k)
@@ -924,25 +927,25 @@
                           gxs (gensym "s__")
                           do-mod (fn do-mod [[[k v :as pair] & etc]]
                                    (cond
-                                     (= k :let) `(let ~v ~(do-mod etc))
-                                     (= k :while) `(when ~v ~(do-mod etc))
-                                     (= k :when) `(if ~v
-                                                    ~(do-mod etc)
-                                                    (recur (rest ~gxs)))
-                                     (keyword? k) (err "Invalid 'for' keyword " k)
-                                     next-groups
-                                      `(let [iterys# ~(emit-bind next-groups)
-                                             fs# (seq (iterys# ~next-expr))]
-                                         (if fs#
-                                           (concat fs# (~giter (rest ~gxs)))
-                                           (recur (rest ~gxs))))
-                                     :else `(cons ~body-expr
-                                                  (~giter (rest ~gxs)))))]
+                                    (= k :let) `(let ~v ~(do-mod etc))
+                                    (= k :while) `(when ~v ~(do-mod etc))
+                                    (= k :when) `(if ~v
+                                                   ~(do-mod etc)
+                                                   (recur (rest ~gxs)))
+                                    (keyword? k) (err "Invalid 'for' keyword " k)
+                                    next-groups
+                                    `(let [iterys# ~(emit-bind next-groups)
+                                           fs# (seq (iterys# ~next-expr))]
+                                       (if fs#
+                                         (concat fs# (~giter (rest ~gxs)))
+                                         (recur (rest ~gxs))))
+                                    :else `(cons ~body-expr
+                                                 (~giter (rest ~gxs)))))]
                       `(fn ~giter [~gxs]
                          (lazy-seq
-                           (loop [~gxs ~gxs]
-                             (when-first [~bind ~gxs]
-                               ~(do-mod mod-pairs)))))))]
+                          (loop [~gxs ~gxs]
+                            (when-first [~bind ~gxs]
+                              ~(do-mod mod-pairs)))))))]
     `(let [iter# ~(emit-bind (to-groups seq-exprs))]
        (iter# ~(second seq-exprs)))))
 
@@ -952,8 +955,8 @@
   the head of the sequence. Returns nil."
   [seq-exprs & body]
   (assert-args doseq
-     (vector? seq-exprs) "a vector for its binding"
-     (even? (count seq-exprs)) "an even number of forms in binding vector")
+               (vector? seq-exprs) "a vector for its binding"
+               (even? (count seq-exprs)) "an even number of forms in binding vector")
   (let [step (fn step [recform exprs]
                (if-not exprs
                  [true `(do ~@body)]
@@ -966,20 +969,20 @@
                        needrec (steppair 0)
                        subform (steppair 1)]
                    (cond
-                     (= k :let) [needrec `(let ~v ~subform)]
-                     (= k :while) [false `(when ~v
+                    (= k :let) [needrec `(let ~v ~subform)]
+                    (= k :while) [false `(when ~v
+                                           ~subform
+                                           ~@(when needrec [recform]))]
+                    (= k :when) [false `(if ~v
+                                          (do
                                             ~subform
-                                            ~@(when needrec [recform]))]
-                     (= k :when) [false `(if ~v
-                                           (do
-                                             ~subform
-                                             ~@(when needrec [recform]))
-                                           ~recform)]
-                     :else [true `(loop [~seqsym (seq ~v)]
-                                    (when ~seqsym
-                                      (let [~k (first ~seqsym)]
-                                        ~subform
-                                        ~@(when needrec [recform]))))]))))]
+                                            ~@(when needrec [recform]))
+                                          ~recform)]
+                    :else [true `(loop [~seqsym (seq ~v)]
+                                   (when ~seqsym
+                                     (let [~k (first ~seqsym)]
+                                       ~subform
+                                       ~@(when needrec [recform]))))]))))]
     (nth (step nil (seq seq-exprs)) 1)))
 
 (defmacro array [& rest]
@@ -987,9 +990,9 @@
                     (take (count rest))
                     (interpose ",")
                     (apply core/str))]
-   (concat
-    (list 'js* (core/str "[" xs-str "]"))
-    rest)))
+    (concat
+     (list 'js* (core/str "[" xs-str "]"))
+     rest)))
 
 (defmacro js-obj [& rest]
   (let [kvs-str (->> (repeat "~{}:~{}")
@@ -1053,8 +1056,8 @@
   (when (seq (apply disj (apply hash-set (keys options)) valid-keys))
     (throw
      (apply core/str "Only these options are valid: "
-	    (first valid-keys)
-	    (map #(core/str ", " %) (rest valid-keys))))))
+            (first valid-keys)
+            (map #(core/str ", " %) (rest valid-keys))))))
 
 (defmacro defmulti
   "Creates a new multimethod with the associated dispatch function.
@@ -1097,7 +1100,7 @@
                cached-hierarchy# (atom {})
                hierarchy# (get ~options :hierarchy cljel.core/global-hierarchy)]
            (cljel.core/MultiFn. ~(name mm-name) ~dispatch-fn ~default hierarchy#
-                               method-table# prefer-table# method-cache# cached-hierarchy#))))))
+                                method-table# prefer-table# method-cache# cached-hierarchy#))))))
 
 (defmacro defmethod
   "Creates and installs a new method of multimethod associated with dispatch-value. "
@@ -1166,4 +1169,3 @@
      (binding [cljel.core/*print-fn* (fn [x#] (.append sb# x#))]
        ~@body)
      (cljel.core/str sb#)))
-
