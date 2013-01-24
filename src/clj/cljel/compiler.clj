@@ -215,12 +215,11 @@
 
 (defmethod emit :var
   [{:keys [info env] :as arg}]
-  (let [n (:name info)
-        n (if (= (namespace n) "js")
-            (name n)
-            info)]
+  (let [n (:name info)]
     (when-not (= :statement (:context env))
-      (emits (munge n)))))
+      (emits (if (= (namespace n) "el")
+               (name n)
+               (munge info))))))
 
 (defmethod emit :meta
   [{:keys [expr meta env]}]
