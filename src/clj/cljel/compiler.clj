@@ -211,10 +211,6 @@
                               (comma-sep (map #(fn [] (emit-constant %)) x))
                               ["])"])))
 
-(defmacro emit-wrap [env & body]
-  `(let [env# ~env]
-     ~@body))
-
 (defmethod emit :no-op [m])
 
 (defmethod emit :var
@@ -224,67 +220,63 @@
             (name n)
             info)]
     (when-not (= :statement (:context env))
-      (emit-wrap env (emits (munge n))))))
+      (emits (munge n)))))
 
 (defmethod emit :meta
   [{:keys [expr meta env]}]
-  (emit-wrap env
-             (emits "cljel.core.with_meta(" expr "," meta ")")))
+  (emits "cljel.core.with_meta(" expr "," meta ")"))
 
 (def ^:private array-map-threshold 16)
 (def ^:private obj-map-threshold 32)
 
 (defmethod emit :map
   [{:keys [env simple-keys? keys vals]}]
-  (emit-wrap env
-             (cond
-              (zero? (count keys))
-              (emits "cljel.core.ObjMap.EMPTY")
+  (cond
+   (zero? (count keys))
+   (emits "cljel.core.ObjMap.EMPTY")
 
-              (and simple-keys? (<= (count keys) obj-map-threshold))
-              (emits "cljel.core.ObjMap.fromObject(["
-                     (comma-sep keys) ; keys
-                     "],{"
-                     (comma-sep (map (fn [k v]
-                                       (with-out-str
-                                         (emit k) (print ":") (emit v)))
-                                     keys vals)) ; js obj
-                     "})")
+   (and simple-keys? (<= (count keys) obj-map-threshold))
+   (emits "cljel.core.ObjMap.fromObject(["
+          (comma-sep keys) ; keys
+          "],{"
+          (comma-sep (map (fn [k v]
+                            (with-out-str
+                              (emit k) (print ":") (emit v)))
+                          keys vals)) ; js obj
+          "})")
 
-              (<= (count keys) array-map-threshold)
-              (emits "cljel.core.PersistentArrayMap.fromArrays(["
-                     (comma-sep keys)
-                     "],["
-                     (comma-sep vals)
-                     "])")
+   (<= (count keys) array-map-threshold)
+   (emits "cljel.core.PersistentArrayMap.fromArrays(["
+          (comma-sep keys)
+          "],["
+          (comma-sep vals)
+          "])")
 
-              :else
-              (emits "cljel.core.PersistentHashMap.fromArrays(["
-                     (comma-sep keys)
-                     "],["
-                     (comma-sep vals)
-                     "])"))))
+   :else
+   (emits "cljel.core.PersistentHashMap.fromArrays(["
+          (comma-sep keys)
+          "],["
+          (comma-sep vals)
+          "])")))
 
 (defmethod emit :vector
   [{:keys [items env]}]
-  (emit-wrap env
-             (if (empty? items)
-               (emits "cljel.core.PersistentVector.EMPTY")
-               (emits "cljel.core.PersistentVector.fromArray(["
-                      (comma-sep items) "], true)"))))
+  (if (empty? items)
+    (emits "cljel.core.PersistentVector.EMPTY")
+    (emits "cljel.core.PersistentVector.fromArray(["
+           (comma-sep items) "], true)")))
 
 (defmethod emit :set
   [{:keys [items env]}]
-  (emit-wrap env
-             (if (empty? items)
-               (emits "cljel.core.PersistentHashSet.EMPTY")
-               (emits "cljel.core.PersistentHashSet.fromArray(["
-                      (comma-sep items) "])"))))
+  (if (empty? items)
+    (emits "cljel.core.PersistentHashSet.EMPTY")
+    (emits "cljel.core.PersistentHashSet.fromArray(["
+           (comma-sep items) "])")))
 
 (defmethod emit :constant
   [{:keys [form env]}]
   (when-not (= :statement (:context env))
-    (emit-wrap env (emit-constant form))))
+    (emit-constant form)))
 
 (defn get-tag [e]
   (or (-> e :tag)
@@ -382,69 +374,67 @@
 
 (defn emit-fn-method
   [{:keys [type name variadic params expr env recurs max-fixed-arity]}]
-  (emit-wrap env
-             (when name
-               (emitln "(let ((" name " nil))")
-               (emitln "(fset '" name " "))
-             (emitln"(lambda (" (space-sep (map munge params)) ")")
-             (when type
-               (emitln "var self__ = this;"))
-             (when recurs
-               (emitln "(catch 'break")
-               (emitln "(while t")
-               (emitln "(catch 'continue"))
-             (let [rname (gensym)]
-               (emits "(let ((" rname " ")
-               (emits expr)
-               (emitln "))")
-               (if recurs
-                 (do (emitln "(throw 'break " rname ")")
-                     (emitln ")")
-                     (emitln ")")
-                     (emitln ")"))
-                 (emitln rname)))
-             (emitln ")")
-             (emitln ")")
-             (when name
-               (emitln ")")
-               (emitln "(function " name ")")
-               (emitln ")"))))
+  (when name
+    (emitln "(let ((" name " nil))")
+    (emitln "(fset '" name " "))
+  (emitln"(lambda (" (space-sep (map munge params)) ")")
+  (when type
+    (emitln "var self__ = this;"))
+  (when recurs
+    (emitln "(catch 'break")
+    (emitln "(while t")
+    (emitln "(catch 'continue"))
+  (let [rname (gensym)]
+    (emits "(let ((" rname " ")
+    (emits expr)
+    (emitln "))")
+    (if recurs
+      (do (emitln "(throw 'break " rname ")")
+          (emitln ")")
+          (emitln ")")
+          (emitln ")"))
+      (emitln rname)))
+  (emitln ")")
+  (emitln ")")
+  (when name
+    (emitln ")")
+    (emitln "(function " name ")")
+    (emitln ")")))
 
 (defn emit-variadic-fn-method
   [{:keys [type name variadic params expr env recurs max-fixed-arity] :as f}]
-  (emit-wrap env
-             (let [named? name
-                   name (or name (gensym))
-                   mname (munge name)
-                   params (map munge params)]
-               (when named?
-                 (emitln "(let ((" name " nil))")
-                 (emitln "(fset '" name " "))
-               (emitln "(lambda (" (space-sep
-                                    (concat (butlast params)
-                                            ['&rest (last params)])) ")")
-               (when type
-                 (emitln "var self__ = this;"))
-               (when recurs
-                 (emitln "(catch 'break")
-                 (emitln "(while t")
-                 (emitln "(catch 'continue"))
-               (let [rname (gensym)]
-                 (emits "(let ((" rname " ")
-                 (emits expr)
-                 (emitln "))")
-                 (if recurs
-                   (do (emitln "(throw 'break " rname ")")
-                       (emitln ")")
-                       (emitln ")")
-                       (emitln ")"))
-                   (emitln rname))
-                 (emitln ")"))
-               (emitln ")")
-               (when named?
-                 (emitln ")")
-                 (emitln "(function " mname ")")
-                 (emitln ")")))))
+  (let [named? name
+        name (or name (gensym))
+        mname (munge name)
+        params (map munge params)]
+    (when named?
+      (emitln "(let ((" name " nil))")
+      (emitln "(fset '" name " "))
+    (emitln "(lambda (" (space-sep
+                         (concat (butlast params)
+                                 ['&rest (last params)])) ")")
+    (when type
+      (emitln "var self__ = this;"))
+    (when recurs
+      (emitln "(catch 'break")
+      (emitln "(while t")
+      (emitln "(catch 'continue"))
+    (let [rname (gensym)]
+      (emits "(let ((" rname " ")
+      (emits expr)
+      (emitln "))")
+      (if recurs
+        (do (emitln "(throw 'break " rname ")")
+            (emitln ")")
+            (emitln ")")
+            (emitln ")"))
+        (emitln rname))
+      (emitln ")"))
+    (emitln ")")
+    (when named?
+      (emitln ")")
+      (emitln "(function " mname ")")
+      (emitln ")"))))
 
 (defmethod emit :fn
   [{:keys [name env methods max-fixed-arity variadic recur-frames loop-lets]}]
@@ -660,49 +650,47 @@
                   nil]
                  [f nil]))))
           [f nil])]
-    (emit-wrap env
-               (cond
-                opt-not?
-                (emits "!(" (first args) ")")
+    (cond
+     opt-not?
+     (emits "!(" (first args) ")")
 
-                proto?
-                (let [pimpl (str (munge (protocol-prefix protocol))
-                                 (munge (name (:name info))) "$arity$"
-                                 (count args))]
-                  (emits (first args) "." pimpl "(" (comma-sep args) ")"))
+     proto?
+     (let [pimpl (str (munge (protocol-prefix protocol))
+                      (munge (name (:name info))) "$arity$"
+                      (count args))]
+       (emits (first args) "." pimpl "(" (comma-sep args) ")"))
 
-                keyword?
-                (emits "(new cljel.core.Keyword(" f ")).call("
-                       (comma-sep (cons "null" args))
-                       ")")
+     keyword?
+     (emits "(new cljel.core.Keyword(" f ")).call("
+            (comma-sep (cons "null" args))
+            ")")
 
-                variadic-invoke
-                (let [mfa (:max-fixed-arity variadic-invoke)]
-                  (emits f "(" (comma-sep (take mfa args))
-                         (when-not (zero? mfa) ",")
-                         "cljel.core.array_seq([" (comma-sep (drop mfa args))
-                         "], 0))"))
+     variadic-invoke
+     (let [mfa (:max-fixed-arity variadic-invoke)]
+       (emits f "(" (comma-sep (take mfa args))
+              (when-not (zero? mfa) ",")
+              "cljel.core.array_seq([" (comma-sep (drop mfa args))
+              "], 0))"))
 
-                (or fn? js? goog?)
-                (emits f "(" (comma-sep args)  ")")
+     (or fn? js? goog?)
+     (emits f "(" (comma-sep args)  ")")
 
-                :else
-                (if (and ana/*cljel-static-fns* (= (:op f) :var))
-                  (let [fprop (str ".cljel$lang$arity$" (count args))]
-                    (emits "(" f fprop " ? " f fprop "(" (comma-sep args) ") : "
-                           f ".call(" (comma-sep (cons "null" args)) "))"))
-                  (emitln "(" f " " (space-sep args) ")"))))))
+     :else
+     (if (and ana/*cljel-static-fns* (= (:op f) :var))
+       (let [fprop (str ".cljel$lang$arity$" (count args))]
+         (emits "(" f fprop " ? " f fprop "(" (comma-sep args) ") : "
+                f ".call(" (comma-sep (cons "null" args)) "))"))
+       (emitln "(" f " " (space-sep args) ")")))))
 
 (defmethod emit :new
   [{:keys [ctor args env]}]
-  (emit-wrap env
-             (emits "(new " ctor "("
-                    (comma-sep args)
-                    "))")))
+  (emits "(new " ctor "("
+         (comma-sep args)
+         "))"))
 
 (defmethod emit :set!
   [{:keys [target val env]}]
-  (emit-wrap env (emits "(setq " target " " val ")\n")))
+  (emits "(setq " target " " val ")\n"))
 
 (defmethod emit :ns
   [{:keys [name requires uses requires-macros env]}]
@@ -760,20 +748,18 @@
 
 (defmethod emit :dot
   [{:keys [target field method args env]}]
-  (emit-wrap env
-             (if field
-               (emits target "." (munge field #{}))
-               (emits target "." (munge method #{}) "("
-                      (comma-sep args)
-                      ")"))))
+  (if field
+    (emits target "." (munge field #{}))
+    (emits target "." (munge method #{}) "("
+           (comma-sep args)
+           ")")))
 
 (defmethod emit :js
   [{:keys [env code segs args]}]
-  (emit-wrap env
-             (if code
-               (emits code)
-               (emits (interleave (concat segs (repeat nil))
-                                  (concat args [nil]))))))
+  (if code
+    (emits code)
+    (emits (interleave (concat segs (repeat nil))
+                       (concat args [nil])))))
 
 (defn forms-seq
   "Seq of forms in a Clojure or ClojureScript file."
