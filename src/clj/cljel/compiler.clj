@@ -796,7 +796,7 @@
                 *data-readers* tags/*cljel-data-readers*
                 *position* (atom [0 0])
                 *emitted-provides* (atom #{})]
-        (emitln "(setq lexical-binding t)")
+        (emitln ";; lexical-binding: t")
         (loop [forms (forms-seq src)
                ns-name nil
                deps nil]
