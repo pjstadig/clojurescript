@@ -683,13 +683,17 @@
 
 (defmethod emit :new
   [{:keys [ctor args env]}]
-  (emits "(new " ctor "("
-         (comma-sep args)
-         "))"))
+  (emits "(funcall (gethash 'constructor (second " ctor "))")
+  (doseq [arg args]
+    (emits " " arg))
+  (emitln ")"))
 
 (defmethod emit :set!
   [{:keys [target val env]}]
-  (emits "(setq " target " " val ")\n"))
+  (if (= (:op target) :dot)
+    (emits "(puthash '" (:field target) " " val " (cadr "
+           (:target target) "))\n")
+    (emits "(setq " target " " val ")\n")))
 
 (defmethod emit :ns
   [{:keys [name requires uses requires-macros env]}]
@@ -703,17 +707,23 @@
 (defmethod emit :deftype*
   [{:keys [t fields pmasks]}]
   (let [fields (map munge fields)]
-    (emit-provide t)
-    (emitln "")
-    (emitln "/**")
-    (emitln "* @constructor")
-    (emitln "*/")
-    (emitln (munge t) " = (function (" (comma-sep fields) "){")
-    (doseq [fld fields]
-      (emitln "this." fld " = " fld ";"))
-    (doseq [[pno pmask] pmasks]
-      (emitln "this.cljel$lang$protocol_mask$partition" pno "$ = " pmask ";"))
-    (emitln "})")))
+    (emitln "(setq " (munge t))
+    (emitln "(list 'cljel.type ")
+    (let [t-obj (gensym)]
+      (emitln "(let ((" t-obj " (make-hash-table)))")
+      (emitln "(puthash 'constructor " )
+      (emitln "(lambda (" (space-sep fields) ")")
+      (let [obj (gensym)]
+        (emitln "(let ((" obj " (make-hash-table)))")
+        (doseq [field fields]
+          (emitln "(puthash '" field " " field  " " obj ")"))
+        (emitln "(list '" (munge t) " " obj ")")
+        (emitln ")"))
+      (emitln ")")
+      (emitln " " t-obj ")")
+      (emitln " " t-obj ")"))
+    (emitln ")")
+    (emitln ")")))
 
 (defmethod emit :defrecord*
   [{:keys [t fields pmasks]}]

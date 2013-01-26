@@ -1,0 +1,3 @@
+(deftype Bar [foo])
+(defn create []
+(.foo (Bar. 1)))
